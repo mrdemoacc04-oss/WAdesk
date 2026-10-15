@@ -1,0 +1,11 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 800 800" width="800" height="800">
+  <defs><linearGradient id="g" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#0d9488"/><stop offset="1" stop-color="#0ea5e9"/></linearGradient></defs>
+  <rect width="800" height="800" fill="url(#g)"/>
+  <circle cx="610" cy="190" r="210" fill="#fff" fill-opacity="0.12"/>
+  <circle cx="170" cy="660" r="260" fill="#000" fill-opacity="0.10"/>
+  <g fill="#fff" fill-opacity="0.92">
+    <path d="M290 250 L360 210 Q400 235 440 210 L510 250 L470 330 L450 315 L450 560 L350 560 L350 315 L330 330Z"/>
+  </g>
+  <text x="60" y="720" font-family="Georgia, 'Times New Roman', serif" font-size="54" font-style="italic" fill="#fff">Studio Linen Shirt</text>
+  <text x="60" y="760" font-family="system-ui, -apple-system, Helvetica, Arial, sans-serif" font-size="26" font-weight="600" fill="#fff" fill-opacity="0.85">Autumn collection</text>
+</svg>

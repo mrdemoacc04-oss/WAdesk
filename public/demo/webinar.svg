@@ -1,0 +1,17 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1200 675" width="1200" height="675">
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#062b21"/><stop offset="0.6" stop-color="#0b5d43"/><stop offset="1" stop-color="#25d366"/></linearGradient>
+  </defs>
+  <rect width="1200" height="675" fill="url(#bg)"/>
+  <g fill="none" stroke="#fff" stroke-opacity="0.12" stroke-width="2">
+    <path d="M0 520 Q300 420 600 520 T1200 500"/><path d="M0 580 Q300 480 600 580 T1200 560"/><path d="M0 640 Q300 540 600 640 T1200 620"/>
+  </g>
+  <rect x="90" y="130" width="560" height="360" rx="28" fill="#000" fill-opacity="0.28"/>
+  <rect x="110" y="150" width="520" height="320" rx="20" fill="#0a3d2e" stroke="#fff" stroke-opacity="0.18"/>
+  <circle cx="370" cy="290" r="64" fill="#25d366"/><path d="M350 255 L350 325 L408 290Z" fill="#052e22"/>
+  <text x="110" y="560" font-family="system-ui, -apple-system, Helvetica, Arial, sans-serif" font-size="30" fill="#bbf7d0" fill-opacity="0.9">LIVE WEBINAR · FREE</text>
+  <text x="700" y="250" font-family="system-ui, -apple-system, Helvetica, Arial, sans-serif" font-size="64" font-weight="800" fill="#fff">Scale your</text>
+  <text x="700" y="325" font-family="system-ui, -apple-system, Helvetica, Arial, sans-serif" font-size="64" font-weight="800" fill="#fff">business with</text>
+  <text x="700" y="400" font-family="Georgia, serif" font-size="68" font-style="italic" fill="#bbf7d0">WhatsApp</text>
+  <text x="700" y="470" font-family="system-ui, -apple-system, Helvetica, Arial, sans-serif" font-size="30" fill="#fff" fill-opacity="0.8">Sat 24 Oct · 6 PM IST</text>
+</svg>

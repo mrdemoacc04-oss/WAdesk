@@ -162,10 +162,18 @@ export function Dashboard() {
             ) : (
               <div className="space-y-5">
                 <div className="flex items-start gap-3">
-                  <span className={cn("mt-1.5 size-2.5 shrink-0 rounded-full", live && acct?.status === "connected" ? "bg-accent-bright animate-pulse-ring" : live ? "bg-warn" : "bg-info")} />
+                  <span className={cn("mt-1.5 size-2.5 shrink-0 rounded-full", live && acct?.status === "connected" ? "bg-accent-bright animate-pulse-ring" : live || cfg?.providerMode === "none" ? "bg-warn" : "bg-info")} />
                   <div className="min-w-0">
-                    <p className="text-[15px] font-medium">{live ? (acct?.verified_name ?? "WhatsApp Business") : "Demo connection"}</p>
-                    <p className="line-clamp-2 text-sm text-ink-3">{live ? (acct?.display_phone_number ? formatPhone(acct.display_phone_number) : "Connected") : "Messages are simulated. Connect your number to go live."}</p>
+                    <p className="text-[15px] font-medium">{live ? (acct?.verified_name ?? "WhatsApp Business") : cfg?.providerMode === "mock" ? "Demo connection" : "WhatsApp not connected"}</p>
+                    <p className="line-clamp-2 text-sm text-ink-3">
+                      {live
+                        ? acct?.display_phone_number
+                          ? formatPhone(acct.display_phone_number)
+                          : "Connected"
+                        : cfg?.providerMode === "mock"
+                          ? "Messages are simulated. Connect your number to go live."
+                          : "Add your Cloud API credentials to start sending."}
+                    </p>
                   </div>
                   {!live && (
                     <Link href="/settings" className={cn(buttonVariants({ variant: "soft", size: "xs" }), "ml-auto shrink-0")}>

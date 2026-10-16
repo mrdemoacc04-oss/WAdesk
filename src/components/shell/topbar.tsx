@@ -1,5 +1,6 @@
 "use client";
 import * as React from "react";
+import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { Desktop, Gear, MagnifyingGlass, Moon, SignOut, Sun } from "@phosphor-icons/react";
 import { Avatar, Kbd } from "@/components/ui/display";
@@ -44,6 +45,12 @@ export function Topbar({ onSearch }: { onSearch: () => void }) {
             <span className="size-1.5 rounded-full bg-info" />
             Demo mode · messages are simulated
           </span>
+        )}
+        {cfg?.providerMode === "none" && (
+          <Link href="/settings" className="mr-1 hidden h-8 items-center gap-2 rounded-full bg-warn-soft px-3 text-xs font-medium text-warn outline-none transition-opacity hover:opacity-80 focus-visible:ring-2 focus-visible:ring-accent/60 lg:inline-flex">
+            <span className="size-1.5 rounded-full bg-warn" />
+            WhatsApp not connected · connect to start sending
+          </Link>
         )}
         <button
           onClick={() => setTheme(resolved === "dark" ? "light" : "dark")}

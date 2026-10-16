@@ -19,7 +19,8 @@ export const GET = api(async (ctx): Promise<AppConfig> => {
   return {
     mode: mode(),
     appName,
-    providerMode: pm === "live" ? "live" : "mock",
+    // Report the truth: only the local demo simulates messages. A real workspace with no number connected is "none".
+    providerMode: pm,
     user: ctx.user,
     workspace: { id: ws.id, name: ws.name, settings: ws.settings },
     account,

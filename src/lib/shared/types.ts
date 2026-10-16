@@ -431,7 +431,8 @@ export interface ProviderMode {
 export interface AppConfig {
   mode: "local" | "supabase";
   appName: string;
-  providerMode: "mock" | "live";
+  /** "mock" = the demo simulator (local development only); "live" = a connected number; "none" = real workspace, nothing connected yet */
+  providerMode: "mock" | "live" | "none";
   user: { id: Id; name: string; email: string; role: Role; color: string };
   workspace: { id: Id; name: string; settings: WorkspaceSettings };
   account: WaAccount | null;

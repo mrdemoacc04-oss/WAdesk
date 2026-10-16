@@ -7,6 +7,25 @@ export function mode(): Mode {
   return process.env.NEXT_PUBLIC_SUPABASE_URL ? "supabase" : "local";
 }
 
+/**
+ * Demo mode (a local JSON store, one implicit owner, no login) exists for development only.
+ * It is never allowed on Vercel, and in a production build only when WADESK_DEMO=1 is set on purpose —
+ * so a deployment that is missing its Supabase variables fails closed instead of opening an unauthenticated app.
+ */
+export function demoAllowed(): boolean {
+  if (process.env.VERCEL) return false;
+  return process.env.NODE_ENV !== "production" || process.env.WADESK_DEMO === "1";
+}
+
+/** null when this deployment can serve requests; otherwise the names of the variables that are missing. */
+export function setupProblem(): { missing: string[] } | null {
+  if (mode() === "local") return demoAllowed() ? null : { missing: ["NEXT_PUBLIC_SUPABASE_URL", "NEXT_PUBLIC_SUPABASE_ANON_KEY", "SUPABASE_SERVICE_ROLE_KEY"] };
+  const missing: string[] = [];
+  if (!process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY) missing.push("NEXT_PUBLIC_SUPABASE_ANON_KEY");
+  if (!process.env.SUPABASE_SERVICE_ROLE_KEY) missing.push("SUPABASE_SERVICE_ROLE_KEY");
+  return missing.length ? { missing } : null;
+}
+
 export function supabaseEnv() {
   const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
   const anon = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;

@@ -1,6 +1,6 @@
 import { z } from "zod";
 import { api, body, HttpError } from "@/lib/server/http";
-import { mode } from "@/lib/server/env";
+import { mode, publicUrl } from "@/lib/server/env";
 import { listMembers } from "@/lib/server/services/workspace";
 import type { Member } from "@/lib/shared/types";
 
@@ -26,8 +26,9 @@ export const POST = api(
     const root = dbFor(ctx.ws);
     await root.delete("workspace_invites", { email: d.email.toLowerCase() });
     await root.insertOne("workspace_invites", { email: d.email.toLowerCase(), role: d.role, name, color });
+    // The invite link signs the person in at /auth/callback, then sends them to choose a password.
     const { error } = await supabaseAdmin().auth.admin.inviteUserByEmail(d.email, {
-      redirectTo: `${process.env.NEXT_PUBLIC_APP_URL ?? ""}/`,
+      redirectTo: `${publicUrl(req)}/auth/callback?next=/reset-password`,
     });
     if (error) {
       await root.delete("workspace_invites", { email: d.email.toLowerCase() });

@@ -3,7 +3,7 @@ import { flushLocal, LocalAdapter, localStore } from "./db/local";
 import { Db } from "./db/scoped";
 import { SupabaseAdapter } from "./db/supabase";
 import type { Adapter } from "./db/types";
-import { mode, type Mode } from "./env";
+import { demoAllowed, mode, type Mode } from "./env";
 import { seedLocal } from "./seed";
 import { supabaseAdmin } from "@/lib/supabase/admin";
 import type { Member, Role } from "@/lib/shared/types";
@@ -29,9 +29,10 @@ export function ensureSeeded() {
 /** Unscoped adapter with full privileges — only for webhooks, the dispatcher and cron. */
 export function rootAdapter(): Adapter {
   if (mode() === "local") {
-    if (process.env.VERCEL) {
+    // Backstop behind the proxy: never serve the unauthenticated demo store outside development.
+    if (!demoAllowed()) {
       throw new Error(
-        "Supabase isn't configured on this deployment. Add NEXT_PUBLIC_SUPABASE_URL, NEXT_PUBLIC_SUPABASE_ANON_KEY and SUPABASE_SERVICE_ROLE_KEY in your Vercel project settings.",
+        "Supabase isn't configured on this deployment. Add NEXT_PUBLIC_SUPABASE_URL, NEXT_PUBLIC_SUPABASE_ANON_KEY and SUPABASE_SERVICE_ROLE_KEY in your hosting environment variables (set WADESK_DEMO=1 only for a deliberate local demo).",
       );
     }
     ensureSeeded();

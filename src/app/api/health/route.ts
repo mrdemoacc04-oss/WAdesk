@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { mode } from "@/lib/server/env";
+import { demoAllowed, mode, setupProblem } from "@/lib/server/env";
 
 export const dynamic = "force-dynamic";
 
@@ -16,6 +16,14 @@ export async function GET() {
     appUrl: !!process.env.NEXT_PUBLIC_APP_URL,
   };
   const problems: string[] = [];
+  const setup = setupProblem();
+  if (setup) {
+    problems.push(
+      !supabase && !demoAllowed()
+        ? `Supabase isn't configured, and demo mode is disabled outside development — the app is closed until you set: ${setup.missing.join(", ")}`
+        : `Not ready to serve — missing: ${setup.missing.join(", ")}`,
+    );
+  }
   if (supabase) {
     if (!checks.supabaseAnonKey) problems.push("NEXT_PUBLIC_SUPABASE_ANON_KEY is missing");
     if (!checks.supabaseServiceRole) problems.push("SUPABASE_SERVICE_ROLE_KEY is missing");

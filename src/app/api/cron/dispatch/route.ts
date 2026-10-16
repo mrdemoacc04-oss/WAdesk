@@ -1,3 +1,4 @@
+import crypto from "node:crypto";
 import { NextResponse, type NextRequest } from "next/server";
 import { rootAdapter } from "@/lib/server/context";
 import { mode } from "@/lib/server/env";
@@ -13,7 +14,10 @@ export const maxDuration = 60;
 export async function GET(req: NextRequest) {
   const secret = process.env.CRON_SECRET;
   if (mode() === "supabase") {
-    if (!secret || req.headers.get("authorization") !== `Bearer ${secret}`) return new NextResponse("Unauthorized", { status: 401 });
+    // constant-time compare; refuses everything when CRON_SECRET isn't set
+    const given = Buffer.from(req.headers.get("authorization") ?? "");
+    const want = Buffer.from(`Bearer ${secret ?? ""}`);
+    if (!secret || given.length !== want.length || !crypto.timingSafeEqual(given, want)) return new NextResponse("Unauthorized", { status: 401 });
   }
   const result = await dispatchTick(rootAdapter(), 50_000);
   return NextResponse.json({ ok: true, ...result });

@@ -1,5 +1,6 @@
 import { dbFor, type Ctx } from "../context";
 import { encrypt } from "../crypto";
+import { mode } from "../env";
 import { HttpError } from "../http";
 import { CloudProvider } from "../wa/cloud";
 import { asWaError } from "../wa/errors";
@@ -25,6 +26,9 @@ export async function connectAccount(ctx: Ctx, input: ConnectInput): Promise<WaA
 
   const token = input.access_token?.trim();
   if (!token && !existingSecrets?.access_token_enc) throw new HttpError(422, "VALIDATION", "Paste your access token.");
+  // Webhooks are only accepted when their signature can be checked, so a live workspace must store the app secret.
+  if (mode() === "supabase" && !input.app_secret?.trim() && !existingSecrets?.app_secret_enc)
+    throw new HttpError(422, "VALIDATION", "Paste your app secret — WAdesk needs it to verify that webhook calls really come from Meta.");
 
   let tokenPlain = token;
   if (!tokenPlain && existingSecrets?.access_token_enc) {

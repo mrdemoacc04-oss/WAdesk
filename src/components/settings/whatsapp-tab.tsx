@@ -165,12 +165,15 @@ function ConnectionForm({ canEdit }: { canEdit: boolean }) {
 
   const hasToken = !!cfg?.account?.has_token && cfg.account.status !== "disconnected";
   const hasSecret = !!cfg?.account?.has_app_secret && cfg.account.status !== "disconnected";
+  const liveDeploy = cfg?.mode === "supabase";
 
   const errs = {
     phone_number_id: !/^\d{5,40}$/.test(val("phone_number_id").trim()) ? "The Phone number ID is a long number with digits only." : undefined,
     waba_id: !/^\d{5,40}$/.test(val("waba_id").trim()) ? "The WhatsApp Business Account ID is a long number with digits only." : undefined,
     access_token: !val("access_token").trim() && !hasToken ? "Paste your permanent access token." : undefined,
     app_id: val("app_id").trim() && !/^\d{5,40}$/.test(val("app_id").trim()) ? "The App ID is digits only." : undefined,
+    // On a live deployment the app secret is how WAdesk proves a webhook call really came from Meta.
+    app_secret: liveDeploy && !val("app_secret").trim() && !hasSecret ? "Paste your app secret — it's required to verify webhooks from Meta." : undefined,
   };
   const invalid = Object.values(errs).some(Boolean);
 
@@ -260,8 +263,9 @@ function ConnectionForm({ canEdit }: { canEdit: boolean }) {
               <Input id="wa-appid" value={val("app_id")} onChange={(e) => set("app_id")(e.target.value)} inputMode="numeric" placeholder="123456789012345" invalid={!!show.app_id} autoComplete="off" className="[&_input]:font-mono" />
             </Field>
             <Field
-              label="App secret (optional)"
+              label={liveDeploy ? "App secret" : "App secret (optional)"}
               htmlFor="wa-secret"
+              error={show.app_secret}
               hint="Used to check that webhook calls really come from Meta. Same Basic settings page, click Show."
               right={hasSecret ? <span className="inline-flex items-center gap-1 text-accent-ink"><LockKey size={12} weight="fill" /> Saved</span> : undefined}
             >

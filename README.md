@@ -20,6 +20,8 @@ npm run dev          # http://localhost:4600
 
 With no Supabase variables set, WAdesk runs in **demo mode**: data lives in `.data/db.json` (created and seeded on first start) and WhatsApp is **simulated** — messages you send get delivered, read and answered by a background worker within seconds, going through the very same webhook code that production uses. Nothing leaves your machine. Settings → Data lets you reset or clear the sample data.
 
+Demo mode has **no login**, so it only runs under `npm run dev`. It is refused on Vercel, and in any production build (`npm run build && npm start`) unless you set `WADESK_DEMO=1` on purpose. A deployment that is missing its Supabase variables does not fall back to demo mode: it serves a 503 setup page and refuses every API call.
+
 Demo contacts are flagged `source: demo` and are **never sent through a live connection**, so connecting real credentials locally can't message a sample number.
 
 ## Connect your WhatsApp number
@@ -32,7 +34,7 @@ Open **Settings → WhatsApp** and enter:
 | WhatsApp Business Account ID | same page, "WhatsApp Business Account ID" |
 | Access token | Business settings → System users → generate a **permanent** token with `whatsapp_business_management` and `whatsapp_business_messaging` |
 | App ID *(optional)* | needed to upload sample media for image / video / document / carousel templates |
-| App secret *(optional)* | lets WAdesk verify the signature of incoming webhooks |
+| App secret | lets WAdesk verify the signature of incoming webhooks — **required on a live deployment** (optional in demo mode) |
 
 WAdesk checks the credentials against Meta before saving, then stores the token **AES-256-GCM encrypted**; it is never sent back to the browser.
 
@@ -40,21 +42,25 @@ WAdesk checks the credentials against Meta before saving, then stores the token 
 
 ## Deploy: Supabase + Vercel
 
-1. **Supabase** — create a project. In the SQL editor run [`supabase/migrations/0001_init.sql`](supabase/migrations/0001_init.sql). It creates the tables, row-level security, the signup trigger (a new user gets their own workspace; invited users join via a server-written invite), the atomic `claim_campaign_messages` function used by the sender, and the public `media` storage bucket.
-   - Authentication → URL configuration: set *Site URL* to your Vercel URL and add `https://YOUR-APP.vercel.app/**` to redirect URLs.
-   - Authentication → Providers → Email: keep "Confirm email" on for production.
+> The complete go-live checklist (Auth settings, Resend email, DNS, smoke test) is in **[docs/production-setup.md](docs/production-setup.md)**. The short version:
+
+1. **Supabase** — create a project. In the SQL editor run, in order, [`0001_init.sql`](supabase/migrations/0001_init.sql) (tables, row-level security, the signup trigger — a new user gets their own workspace, invited users join via a server-written invite — the atomic `claim_campaign_messages` function used by the sender, and the public `media` bucket) and then [`0002_production_hardening.sql`](supabase/migrations/0002_production_hardening.sql) (role-based RLS: only admins launch campaigns, approve or delete templates and manage the team; anonymous access revoked; upload types limited).
+   - Authentication → URL configuration: set *Site URL* to your domain and add `https://YOUR-DOMAIN/**` to redirect URLs.
+   - Authentication → Providers → Email: keep "Confirm email" **on** — required for production.
+   - Authentication → Emails: set up custom SMTP (e.g. Resend) and paste the templates from [`supabase/email-templates/`](supabase/email-templates). Supabase's built-in mailer is too limited for real users.
 2. **Vercel** — import the repo (framework: Next.js). Add the environment variables from [`.env.example`](.env.example):
 
    | Variable | Value |
    |---|---|
    | `NEXT_PUBLIC_SUPABASE_URL` | Project settings → API → Project URL |
-   | `NEXT_PUBLIC_SUPABASE_ANON_KEY` | the `anon` public key |
-   | `SUPABASE_SERVICE_ROLE_KEY` | the `service_role` key — **server only, never expose it** |
+   | `NEXT_PUBLIC_SUPABASE_ANON_KEY` | the publishable key (`sb_publishable_…`) or the legacy `anon` key |
+   | `SUPABASE_SERVICE_ROLE_KEY` | the secret key (`sb_secret_…`) or legacy `service_role` key — **server only, never expose it** |
    | `APP_ENCRYPTION_KEY` | `openssl rand -base64 32` (encrypts your Meta token at rest) |
    | `CRON_SECRET` | any long random string |
    | `NEXT_PUBLIC_APP_URL` | `https://YOUR-APP.vercel.app` |
    | `META_GRAPH_VERSION` | optional, default `v23.0` |
 
+   The `NEXT_PUBLIC_…` values are baked in at build time — **redeploy after changing them**, then open `/api/health` (it should report `"ok": true`). If any required variable is missing the app deliberately shows a 503 setup page instead of opening.
 3. **Sign up** at your deployed URL (the first account becomes the owner of a new workspace), then connect WhatsApp in Settings and add the webhook in Meta as above.
 4. **Scheduler** — campaigns launched with *Send now* start immediately and keep running while the campaign page is open. For **scheduled** campaigns, and to keep very large sends moving unattended, something must call `GET /api/cron/dispatch` every minute with `Authorization: Bearer $CRON_SECRET`:
    - **Free:** Supabase `pg_cron` + `pg_net` — the snippet is at the bottom of the migration file.
@@ -79,7 +85,7 @@ docs/ui-guide.md         UI kit + API reference
 
 - **Sending** — `processCampaign` claims batches with `FOR UPDATE SKIP LOCKED`, sends at the chosen rate, retries nothing blindly (rate-limit errors back off, fatal auth errors pause the campaign), and persists results in bulk. Opted-out contacts are re-checked at send time.
 - **Compliance built in** — imports require a consent confirmation, unconfirmed contacts are excluded by default, STOP / START are handled automatically, a recipient who blocks marketing is suppressed, and free-form replies are blocked outside the 24-hour window (templates only).
-- **Security** — RLS on every table, secrets table reachable only with the service role, signature verification for webhooks (when an app secret is stored), uploads via signed URLs, CSV export neutralises spreadsheet-formula injection.
+- **Security** — RLS on every table, secrets table reachable only with the service role, signature verification for webhooks (required for every live workspace), uploads via signed URLs, CSV export neutralises spreadsheet-formula injection.
 
 ## Good to know
 

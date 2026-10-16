@@ -666,7 +666,9 @@ export interface CampaignDetail {
 export async function campaignDetail(db: Db, id: string): Promise<CampaignDetail> {
   const camp = await db.get<Campaign>("campaigns", id);
   if (!camp) throw new HttpError(404, "NOT_FOUND", "Campaign not found");
-  const live = camp.status === "sending" ? await refreshStats(db, id) : camp;
+  // The counters are derived by the server, so they're written with the service role — a viewer's own (RLS-bound)
+  // client can't, and shouldn't, be allowed to edit a running campaign.
+  const live = camp.status === "sending" ? await refreshStats(dbFor(db.ws), id) : camp;
   const campaign = live ?? camp;
 
   const [queued, skipped, failedRows, stamped] = await Promise.all([

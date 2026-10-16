@@ -1,6 +1,7 @@
 import { after, NextResponse, type NextRequest } from "next/server";
 import { rootAdapter } from "@/lib/server/context";
 import { decrypt, verifyMetaSignature } from "@/lib/server/crypto";
+import { mode } from "@/lib/server/env";
 import { findAccountByPhoneNumberId, findAccountByWaba, handleWebhookPayload } from "@/lib/server/services/webhook";
 import type { WaAccount } from "@/lib/shared/types";
 import type { Secrets } from "@/lib/server/wa";
@@ -39,6 +40,10 @@ export async function POST(req: NextRequest) {
   if (sec?.app_secret_enc) {
     const ok = verifyMetaSignature(raw, req.headers.get("x-hub-signature-256"), decrypt(sec.app_secret_enc));
     if (!ok) return new NextResponse("Invalid signature", { status: 401 });
+  } else if (mode() === "supabase") {
+    // The phone-number ID isn't a secret, so an unsigned webhook could be forged by anyone who knows it — injecting
+    // fake customer messages and triggering auto-replies from a real number. Live workspaces must store the app secret.
+    return new NextResponse("Webhook signature secret not configured", { status: 401 });
   }
 
   // acknowledge fast; Meta retries anything slower than a few seconds

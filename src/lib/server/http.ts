@@ -29,8 +29,9 @@ export function errorResponse(e: unknown) {
       { status: 422 },
     );
   }
-  const message = e instanceof Error ? e.message : "Unexpected error";
   console.error("[api]", e);
+  // Don't echo database / library internals to the browser in production — they stay in the server log.
+  const message = process.env.NODE_ENV === "production" ? "Something went wrong on our side. Please try again." : e instanceof Error ? e.message : "Unexpected error";
   return NextResponse.json({ error: { code: "INTERNAL", message } }, { status: 500 });
 }
 

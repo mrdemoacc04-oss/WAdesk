@@ -3,6 +3,11 @@ export type Mode = "local" | "supabase";
 export const appName = process.env.NEXT_PUBLIC_APP_NAME || "WAdesk";
 export const graphVersion = process.env.META_GRAPH_VERSION || "v23.0";
 
+/** Who operates this deployment, for the privacy page. Whoever deploys WAdesk sets these to their own details. */
+export const companyName = process.env.NEXT_PUBLIC_COMPANY_NAME || appName;
+const emailLike = /^[^\s@<>"']+@[^\s@<>"']+\.[^\s@<>"']+$/;
+export const privacyEmail = emailLike.test(process.env.NEXT_PUBLIC_PRIVACY_EMAIL ?? "") ? (process.env.NEXT_PUBLIC_PRIVACY_EMAIL as string) : "";
+
 export function mode(): Mode {
   return process.env.NEXT_PUBLIC_SUPABASE_URL ? "supabase" : "local";
 }

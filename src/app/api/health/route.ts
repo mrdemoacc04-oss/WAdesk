@@ -1,12 +1,13 @@
 import { NextResponse } from "next/server";
 import { demoAllowed, mode, setupProblem } from "@/lib/server/env";
+import { schedulerStatus } from "@/lib/server/scheduler";
 
 export const dynamic = "force-dynamic";
 
 /** Deployment self-check: reports which pieces are configured — never their values. */
 export async function GET() {
   const supabase = mode() === "supabase";
-  const checks = {
+  const checks: Record<string, boolean | string> = {
     mode: mode(),
     supabaseUrl: !!process.env.NEXT_PUBLIC_SUPABASE_URL,
     supabaseAnonKey: !!process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY,
@@ -30,6 +31,12 @@ export async function GET() {
     if (!checks.encryptionKey) problems.push("APP_ENCRYPTION_KEY is not set (falling back to a key derived from the service role key)");
     if (!checks.cronSecret) problems.push("CRON_SECRET is not set — /api/cron/dispatch will refuse requests");
     if (!checks.appUrl) problems.push("NEXT_PUBLIC_APP_URL is not set — webhook URL shown in Settings may be wrong behind a proxy");
+    // The scheduler registers itself when the server starts; report whether that worked (only once the rest is configured).
+    if (!setup) {
+      const timer = await schedulerStatus();
+      checks.scheduler = timer.ok;
+      if (!timer.ok) problems.push(`Scheduled sending is off: ${timer.reason}`);
+    }
   }
   return NextResponse.json({ ok: problems.length === 0, checks, problems, time: new Date().toISOString() });
 }

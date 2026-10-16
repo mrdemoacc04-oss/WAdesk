@@ -234,6 +234,13 @@ export function AuthForm({ kind }: { kind: Kind }) {
                 </Link>
               )}
             </p>
+            <p className="mt-5 text-center text-xs text-ink-4">
+              {kind === "signup" ? "By creating a workspace you acknowledge our " : "Read our "}
+              <Link href="/privacy" className="underline underline-offset-2 hover:text-ink-2">
+                Privacy Policy
+              </Link>
+              .
+            </p>
           </>
         )}
       </div>

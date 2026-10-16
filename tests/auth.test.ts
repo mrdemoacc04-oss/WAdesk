@@ -119,6 +119,13 @@ test("PROXY: sign-in, sign-up, password reset and the email-link landing page st
   });
 });
 
+test("PROXY: the privacy policy is public — reachable signed out, and without hijacking a signed-in session", async () => {
+  await withEnv({ NODE_ENV: "production", ...SUPABASE }, async () => {
+    const res = await proxy(req("/privacy"));
+    assert.equal(res.headers.get("x-middleware-next"), "1");
+  });
+});
+
 test("PROXY: the set-new-password page needs a session (it's reached after the email link signs you in)", async () => {
   await withEnv({ NODE_ENV: "production", ...SUPABASE }, async () => {
     const res = await proxy(req("/reset-password"));

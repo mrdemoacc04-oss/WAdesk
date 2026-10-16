@@ -2,6 +2,7 @@ import { dbFor, type Ctx } from "../context";
 import type { Db } from "../db/scoped";
 import type { Adapter, Query, Where } from "../db/types";
 import { HttpError } from "../http";
+import { schedulerStatus } from "../scheduler";
 import { getProvider, type Provider } from "../wa";
 import { asWaError } from "../wa/errors";
 import { chunk, clamp, nowIso, sleep, uniq } from "@/lib/shared/utils";
@@ -359,6 +360,14 @@ export async function launchCampaign(ctx: Ctx, id: string, when: "now" | "schedu
   const firstError = check.issues.find((i) => i.level === "error");
   if (firstError) throw new HttpError(422, "NOT_READY", firstError.message, check.issues);
   if (when === "schedule" && !c.scheduled_at) throw new HttpError(422, "NOT_READY", "Pick a date and time to schedule.");
+  if (when === "schedule") {
+    // Never accept a schedule that nothing would act on: a campaign must not sit waiting for a timer that isn't there.
+    const timer = await schedulerStatus();
+    if (!timer.ok) {
+      console.error(`[wadesk] refusing to schedule a campaign: ${timer.reason}`);
+      throw new HttpError(409, "SCHEDULER_OFF", "Scheduled sending isn't switched on for this deployment yet. You can send now instead, or ask your administrator to enable it.");
+    }
+  }
 
   const total = await materialize(ctx.db, c);
   const now = nowIso();

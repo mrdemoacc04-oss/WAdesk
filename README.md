@@ -44,7 +44,7 @@ WAdesk checks the credentials against Meta before saving, then stores the token 
 
 > The complete go-live checklist (Auth settings, Resend email, DNS, smoke test) is in **[docs/production-setup.md](docs/production-setup.md)**. The short version:
 
-1. **Supabase** — create a project. In the SQL editor run, in order, [`0001_init.sql`](supabase/migrations/0001_init.sql) (tables, row-level security, the signup trigger — a new user gets their own workspace, invited users join via a server-written invite — the atomic `claim_campaign_messages` function used by the sender, and the public `media` bucket) and then [`0002_production_hardening.sql`](supabase/migrations/0002_production_hardening.sql) (role-based RLS: only admins launch campaigns, approve or delete templates and manage the team; anonymous access revoked; upload types limited).
+1. **Supabase** — create a project. In the SQL editor run these three files, in order: [`0001_init.sql`](supabase/migrations/0001_init.sql) (tables, row-level security, the signup trigger — a new user gets their own workspace, invited users join via a server-written invite — the atomic `claim_campaign_messages` function used by the sender, and the public `media` bucket), [`0002_production_hardening.sql`](supabase/migrations/0002_production_hardening.sql) (role-based RLS: only admins launch campaigns, approve or delete templates and manage the team; anonymous access revoked; upload types limited) and [`0003_scheduler.sql`](supabase/migrations/0003_scheduler.sql) (lets the app set up its own once-a-minute scheduler).
    - Authentication → URL configuration: set *Site URL* to your domain and add `https://YOUR-DOMAIN/**` to redirect URLs.
    - Authentication → Providers → Email: keep "Confirm email" **on** — required for production.
    - Authentication → Emails: set up custom SMTP (e.g. Resend) and paste the templates from [`supabase/email-templates/`](supabase/email-templates). Supabase's built-in mailer is too limited for real users.
@@ -58,13 +58,13 @@ WAdesk checks the credentials against Meta before saving, then stores the token 
    | `APP_ENCRYPTION_KEY` | `openssl rand -base64 32` (encrypts your Meta token at rest) |
    | `CRON_SECRET` | any long random string |
    | `NEXT_PUBLIC_APP_URL` | `https://YOUR-APP.vercel.app` |
+   | `NEXT_PUBLIC_COMPANY_NAME` | optional — the name shown on the public privacy page (`/privacy`) |
+   | `NEXT_PUBLIC_PRIVACY_EMAIL` | optional — the contact email shown on the privacy page |
    | `META_GRAPH_VERSION` | optional, default `v23.0` |
 
    The `NEXT_PUBLIC_…` values are baked in at build time — **redeploy after changing them**, then open `/api/health` (it should report `"ok": true`). If any required variable is missing the app deliberately shows a 503 setup page instead of opening.
 3. **Sign up** at your deployed URL (the first account becomes the owner of a new workspace), then connect WhatsApp in Settings and add the webhook in Meta as above.
-4. **Scheduler** — campaigns launched with *Send now* start immediately and keep running while the campaign page is open. For **scheduled** campaigns, and to keep very large sends moving unattended, something must call `GET /api/cron/dispatch` every minute with `Authorization: Bearer $CRON_SECRET`:
-   - **Free:** Supabase `pg_cron` + `pg_net` — the snippet is at the bottom of the migration file.
-   - **Vercel Pro:** add to `vercel.json`: `{"crons":[{"path":"/api/cron/dispatch","schedule":"* * * * *"}]}` (Vercel attaches the `CRON_SECRET` bearer automatically). Hobby plans allow daily crons only.
+4. **Scheduler** — nothing to do. Scheduled campaigns (and unattended large sends) need a timer that calls `/api/cron/dispatch` every minute, and WAdesk **sets that timer up by itself** the first time the production server starts (Supabase `pg_cron` + `pg_net`, via migration `0003_scheduler.sql`, authenticated with `CRON_SECRET` and addressed to `NEXT_PUBLIC_APP_URL`). It re-registers if the address ever changes, and previews never touch it. `/api/health` reports whether it's running, and the app refuses to schedule a campaign when no timer exists rather than letting it wait forever. Prefer your own scheduler (for example a Vercel Pro cron)? Set `WADESK_SCHEDULER=external` and call `GET /api/cron/dispatch` yourself every minute with `Authorization: Bearer $CRON_SECRET`.
 
 ## How it works
 

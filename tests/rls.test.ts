@@ -49,6 +49,19 @@ const SHIM = `
   create extension pg_trgm with schema extensions;
 `;
 
+// Stand-ins for pg_cron / pg_net (the real extensions aren't in PGlite): enough to see what the scheduler functions ask for.
+const CRON_STUBS = `
+  create schema cron;
+  create table cron.job (jobid serial primary key, jobname text unique, schedule text, command text, active boolean not null default true);
+  create table cron.job_run_details (runid serial primary key, jobid int, status text, start_time timestamptz default now());
+  create function cron.schedule(job_name text, schedule text, command text) returns bigint language sql as $$
+    insert into cron.job (jobname, schedule, command) values (job_name, schedule, command)
+    on conflict (jobname) do update set schedule = excluded.schedule, command = excluded.command, active = true
+    returning jobid::bigint
+  $$;
+  create schema net;
+`;
+
 let db: PGlite;
 type Row = Record<string, any>;
 const q = async (sql: string, params: unknown[] = []) => (await db.query<Row>(sql, params)).rows;
@@ -98,9 +111,10 @@ const membership = async (id: string) => (await q("select m.role, m.workspace_id
 
 before(async () => {
   db = new PGlite({ extensions: { pg_trgm } });
-  await db.exec(SHIM);
+  await db.exec(SHIM + CRON_STUBS);
   await db.exec(migration("0001_init.sql"));
   await db.exec(migration("0002_production_hardening.sql"));
+  await db.exec(migration("0003_scheduler.sql"));
 
   // owners come from the signup trigger, exactly like production (confirmation ON: password set, not yet confirmed)
   await signup(U.ownerA, "owner@a.test", { password: true, meta: { workspace_name: "Acme" } });
@@ -409,11 +423,87 @@ test("every table has RLS on, and every table other than the server-only ones ha
   }
 });
 
-test("the hardening migration is safe to run twice", async () => {
+test("the hardening and scheduler migrations are safe to run twice", async () => {
   await db.exec(migration("0002_production_hardening.sql"));
+  await db.exec(migration("0003_scheduler.sql"));
   const draft = (await q("insert into public.campaigns (workspace_id, name, status) values ($1,'rerun draft','draft') returning id", [wsA]))[0].id;
   await asUser(U.agentA, async () => {
     await assert.rejects(() => q("update public.campaigns set status = 'sending' where id = $1", [draft]), denied);
     assert.equal((await q("update public.campaigns set name = 'still editable' where id = $1 returning id", [draft])).length, 1, "drafts remain editable");
   });
+});
+
+/* ───────── automatic scheduler ───────── */
+
+const SECRET = "0123456789abcdef-secret";
+const register = (url: string, secret: string) => asRole("service_role", () => q("select public.wadesk_register_scheduler($1, $2) as result", [url, secret]));
+
+test("the app registers its own once-a-minute timer, and a second call replaces it instead of adding another", async () => {
+  assert.equal((await asRole("service_role", () => q("select public.wadesk_scheduler_status() as s")))[0].s.registered, false, "nothing before the app starts");
+
+  assert.equal((await register("https://app-one.example/api/cron/dispatch", SECRET))[0].result, "scheduled");
+  let jobs = await q("select jobname, schedule, command from cron.job");
+  assert.equal(jobs.length, 1);
+  assert.equal(jobs[0].jobname, "wadesk-dispatch");
+  assert.equal(jobs[0].schedule, "* * * * *");
+  assert.ok(jobs[0].command.includes("https://app-one.example/api/cron/dispatch"));
+  assert.ok(jobs[0].command.includes(`Bearer ${SECRET}`));
+
+  await register("https://app-two.example/api/cron/dispatch", SECRET); // the domain changed
+  jobs = await q("select command from cron.job");
+  assert.equal(jobs.length, 1, "still exactly one job");
+  assert.ok(jobs[0].command.includes("app-two.example") && !jobs[0].command.includes("app-one.example"));
+
+  const s = (await asRole("service_role", () => q("select public.wadesk_scheduler_status() as s")))[0].s;
+  assert.deepEqual({ available: s.available, registered: s.registered }, { available: true, registered: true });
+  assert.ok(!JSON.stringify(s).includes(SECRET), "the status never reveals the secret");
+});
+
+test("the timer only accepts an https address on the dispatch path, and a long enough secret", async () => {
+  for (const bad of [
+    "http://app.example/api/cron/dispatch",
+    "https://app.example/api/other",
+    "https://app.example/api/cron/dispatch?x=1",
+    "https://app.example/api/cron/dispatch'; select 1; --",
+    "https://user@evil.example/api/cron/dispatch",
+    "//app.example/api/cron/dispatch",
+    "javascript:alert(1)",
+    "",
+  ]) {
+    await assert.rejects(() => register(bad, SECRET), /invalid scheduler url/, JSON.stringify(bad));
+  }
+  await assert.rejects(() => register("https://app.example/api/cron/dispatch", "short"), /too short/);
+});
+
+test("a secret containing quotes can't break out of the timer's command", async () => {
+  const nasty = "abc'; drop table public.contacts; --xxxxxxxx";
+  await register("https://app-three.example/api/cron/dispatch", nasty);
+  const cmd = (await q("select command from cron.job where jobname = 'wadesk-dispatch'"))[0].command as string;
+  assert.ok(cmd.includes("Bearer abc''; drop table public.contacts; --xxxxxxxx"), "quotes are doubled, so the secret stays inside its string");
+  assert.equal((await q("select count(*)::int as n from public.contacts"))[0].n >= 0, true, "and nothing was dropped");
+});
+
+test("only the server can set up or inspect the scheduler", async () => {
+  for (const run of [(f: () => Promise<unknown>) => asRole("anon", f), (f: () => Promise<unknown>) => asUser(U.ownerA, f)]) {
+    await run(async () => {
+      await assert.rejects(() => q("select public.wadesk_register_scheduler('https://evil.example/api/cron/dispatch', $1)", [SECRET]), /permission denied/i);
+      await assert.rejects(() => q("select public.wadesk_scheduler_status()"), /permission denied/i);
+    });
+  }
+  const current = (await q("select command from cron.job where jobname = 'wadesk-dispatch'"))[0].command as string;
+  assert.ok(!current.includes("evil.example"), "the job was not redirected");
+});
+
+test("without pg_cron the migrations still apply, and the app is told scheduling is unavailable", async () => {
+  const bare = new PGlite({ extensions: { pg_trgm } });
+  await bare.exec(SHIM); // no cron / net at all
+  await bare.exec(migration("0001_init.sql"));
+  await bare.exec(migration("0002_production_hardening.sql"));
+  await bare.exec(migration("0003_scheduler.sql")); // must not throw
+  await bare.exec("set role service_role");
+  const reg = await bare.query<Row>("select public.wadesk_register_scheduler('https://app.example/api/cron/dispatch', $1) as result", [SECRET]);
+  const status = await bare.query<Row>("select public.wadesk_scheduler_status() as s");
+  assert.equal(reg.rows[0].result, "unavailable");
+  assert.deepEqual({ available: status.rows[0].s.available, registered: status.rows[0].s.registered }, { available: false, registered: false });
+  await bare.close();
 });

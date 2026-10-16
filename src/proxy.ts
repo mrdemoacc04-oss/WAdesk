@@ -8,7 +8,7 @@ import { safeNext } from "@/lib/shared/safe-next";
    it never falls back to an open, unauthenticated app. Local development (demo mode) is the only exception. */
 
 const GUEST_ONLY = ["/login", "/signup", "/forgot-password"]; // signed-in people are sent on to the app
-const OPEN = ["/auth", "/setup-required"]; // email-link landing (it signs people in) and the setup page itself
+const OPEN = ["/auth", "/setup-required", "/privacy"]; // email-link landing (it signs people in), the setup page itself, and the public privacy policy
 
 const under = (path: string, bases: string[]) => bases.some((p) => path === p || path.startsWith(p + "/"));
 

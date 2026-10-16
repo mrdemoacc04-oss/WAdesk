@@ -6,12 +6,13 @@ Everything in the code is enforced for you (login gate, role rules in the databa
 
 ## 1. Database (Supabase → SQL editor)
 
-Run both files, in order, once each:
+Run the three files, in order, once each:
 
 1. `supabase/migrations/0001_init.sql` — tables, RLS, signup trigger, sender function, `media` bucket
 2. `supabase/migrations/0002_production_hardening.sql` — role-based RLS, locked-down grants, invite hardening, upload type limits, indexes
+3. `supabase/migrations/0003_scheduler.sql` — lets the app set up its own once-a-minute scheduler (no manual cron SQL, ever)
 
-`0002` is safe to re-run. Both are covered by `npm test` (`tests/rls.test.ts` runs them on a real Postgres and attacks every boundary).
+`0002` and `0003` are safe to re-run. All three are covered by `npm test` (`tests/rls.test.ts` runs them on a real Postgres and attacks every boundary).
 
 ## 2. Supabase Auth settings
 
@@ -67,6 +68,8 @@ The API key lives only in Supabase's SMTP settings — never in this repo, `.env
 | `APP_ENCRYPTION_KEY` | `openssl rand -base64 32` — encrypts the Meta token and app secret at rest. Don't lose it. |
 | `CRON_SECRET` | `openssl rand -hex 32` |
 | `NEXT_PUBLIC_APP_URL` | `https://YOUR-DOMAIN` |
+| `NEXT_PUBLIC_COMPANY_NAME` | *(optional)* the legal or trading name shown on the privacy page, e.g. `Acme Media Pvt Ltd` |
+| `NEXT_PUBLIC_PRIVACY_EMAIL` | *(optional)* where people send privacy requests, shown on the privacy page |
 
 The `NEXT_PUBLIC_…` values are baked in at **build** time, so after adding or changing variables you must **redeploy** (Deployments → ⋯ → Redeploy). Then open `https://YOUR-DOMAIN/api/health` — it should say `"ok": true`.
 
@@ -74,7 +77,7 @@ The `NEXT_PUBLIC_…` values are baked in at **build** time, so after adding or 
 
 - Settings → WhatsApp: enter the phone number ID, business account ID, access token **and the app secret** (required on a live deployment — webhooks are only accepted when their signature can be verified).
 - In Meta, paste the callback URL and verify token shown in Settings and subscribe to `messages`, `message_template_status_update`, `phone_number_quality_update`.
-- Scheduler: Supabase `pg_cron` snippet at the bottom of `0001_init.sql`, or a Vercel cron on the Pro plan (see README).
+- Scheduler: automatic. After migration `0003`, the app registers its own timer when the production server starts (it needs `CRON_SECRET` and `NEXT_PUBLIC_APP_URL`). Check `/api/health` — it reports `scheduler: true`. To use your own scheduler instead, set `WADESK_SCHEDULER=external`.
 
 ## 6. Smoke test (five minutes)
 

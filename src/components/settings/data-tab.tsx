@@ -6,8 +6,7 @@ import { Badge, Card, CardHeader, Skeleton } from "@/components/ui/display";
 import { Button, buttonVariants } from "@/components/ui/button";
 import { useConfirm } from "@/components/confirm";
 import { post, refresh, toastError } from "@/lib/client/api";
-import { useConfig, useConnection } from "@/lib/client/hooks";
-import { CopyButton } from "./copy-button";
+import { useConfig } from "@/lib/client/hooks";
 
 function DemoDataCard({ canEdit }: { canEdit: boolean }) {
   const confirm = useConfirm();
@@ -81,46 +80,6 @@ function DemoDataCard({ canEdit }: { canEdit: boolean }) {
   );
 }
 
-function DeploymentCard() {
-  const { data: conn } = useConnection();
-  const origin = conn ? conn.webhook_url.replace(/\/api\/webhooks\/whatsapp$/, "") : "https://YOUR-APP.vercel.app";
-  const cronUrl = `${origin}/api/cron/dispatch`;
-  const sql = `select cron.schedule('wadesk-dispatch', '* * * * *', $$
-  select net.http_get(
-    url     := '${cronUrl}',
-    headers := jsonb_build_object('Authorization', 'Bearer YOUR_CRON_SECRET')
-  );
-$$);`;
-
-  return (
-    <Card>
-      <CardHeader title="Deployment" description="One scheduled call keeps campaigns moving." />
-      <div className="space-y-5">
-        <p className="text-[13.5px] leading-relaxed text-ink-2">
-          Scheduled campaigns start, and large sends continue, when this endpoint is called every minute. Protect it with the <code className="font-mono text-[12.5px] text-ink">CRON_SECRET</code> environment variable and send it as a Bearer token.
-        </p>
-        <div>
-          <p className="mb-1.5 text-[13px] font-medium text-ink-2">Cron endpoint</p>
-          <div className="flex items-center gap-2 rounded-xl bg-surface-2 py-1.5 pl-3.5 pr-1.5 hairline">
-            {conn ? <code className="min-w-0 flex-1 break-all font-mono text-[13px]">GET {cronUrl}</code> : <Skeleton className="h-5 flex-1" />}
-            <CopyButton text={cronUrl} iconOnly variant="ghost" label="Copy cron URL" toastMessage="Cron URL copied" />
-          </div>
-        </div>
-        <div>
-          <div className="mb-1.5 flex items-center justify-between gap-3">
-            <p className="text-[13px] font-medium text-ink-2">On a free Vercel plan, schedule it from Supabase</p>
-            <CopyButton text={sql} label="Copy SQL" toastMessage="SQL copied" />
-          </div>
-          <p className="mb-2.5 text-xs leading-relaxed text-ink-3">Vercel&apos;s free plan only allows daily cron jobs. Enable the pg_cron and pg_net extensions, then run this in the Supabase SQL editor.</p>
-          <pre className="hairline max-h-64 overflow-auto rounded-2xl bg-[#14150f] p-4 font-mono text-xs leading-relaxed text-[#d9ddd0]" tabIndex={0} aria-label="pg_cron SQL">
-            <code>{`create extension if not exists pg_cron;\ncreate extension if not exists pg_net;\n\n${sql}`}</code>
-          </pre>
-        </div>
-      </div>
-    </Card>
-  );
-}
-
 export function DataTab({ canEdit }: { canEdit: boolean }) {
   const { data: cfg } = useConfig();
 
@@ -144,12 +103,11 @@ export function DataTab({ canEdit }: { canEdit: boolean }) {
       </Card>
 
       {cfg?.mode === "local" && <DemoDataCard canEdit={canEdit} />}
-      {cfg?.mode === "supabase" && <DeploymentCard />}
       {!cfg && <Skeleton className="h-48 w-full rounded-[26px]" />}
       {cfg?.mode === "local" && (
         <p className="flex items-start gap-2 text-xs leading-relaxed text-ink-3">
           <Flask size={14} className="mt-px shrink-0" />
-          Running locally. Connect Supabase to store your data in the cloud and show deployment settings here.
+          Running locally. Connect Supabase to store your data in the cloud.
         </p>
       )}
     </div>
